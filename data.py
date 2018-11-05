@@ -1,5 +1,5 @@
 """
-Generate synthetic data.
+Generate data.
 """
 
 import argparse
@@ -10,77 +10,15 @@ import random
 import re
 import sys
 
-prep = ['', 'to', 'to the']
-dest = {'': ['home', 'nowhere'],
-        'to': ['japan', 'school', 'germany', 'canada'],
-        'to the': ['stadium', 'station', 'hospital', 'classroom', 'kitchen', 'morgue']}
-advb = ['slowly', 'quickly', 'suddenly', 'reluctantly', 'happily']
-when = ['ten minutes ago', 'five minutes ago', 'yesterday', 'earlier']
-subj = ['she', 'he']
-
 
 def tokenize(text):
     """Tokenize a passage of text, i.e. return a list of words"""
-    text = text.replace('.', '')
     return text.split(' ')
-
-
-def generate_sentence(s=None):
-    """Generate a random sentence."""
-    # if subject is not specified, sample randomly from set
-    s = s or random.sample(subj, 1)[0]
-    v = 'went'
-    p = random.sample(prep, 1)[0]
-    d = random.sample(dest[p], 1)[0]
-    a = random.sample(advb, 1)[0]
-    w = random.sample(when, 1)[0]
-
-    # insert adverb before verb with prob. 40%, after destination with prob. 40%, no adverb with prob. 20%
-    r1 = np.random.rand()
-    if r1 < 0.2:
-        sentence = ' '.join([s, v, p, d])     # e.g. 'she went to school'
-    elif r1 < 0.6:
-        sentence = ' '.join([s, a, v, p, d])  # e.g. 'she reluctantly went to school'
-    else:
-        sentence = ' '.join([s, v, p, d, a])  # e.g. 'she went to school reluctantly'
-
-    # insert clause specifying time with probability 50%
-    r2 = np.random.rand()
-    if r2 < 0.5:
-        sentence += ' ' + w                   # e.g. 'she went to school reluctantly yesterday'
-
-    sentence = sentence.replace('  ', ' ')
-    # record index of destination only if subject is 'she'
-    if s == 'she':
-        index = sentence.split(' ').index(d)
-    else:
-        index = 0
-    return sentence + '.', index
-
-
-def generate_passage(n):
-    """Generate a passage composed of n random sentences."""
-    # ensures that at least one of n sentences has the subject 'she'
-    data = [generate_sentence('she')]
-    for _ in range(n-1):
-        data.append(generate_sentence())
-    random.shuffle(data)
-
-    sentences = ' '.join(d[0] for d in data)   # join all sentences to create passage
-    indices = [d[1] for d in data]             # indices of destination of 'she' (index is relative to each sentence)
-
-    # sentence containing destination is final sentence for which 'she' is the subject
-    target_sentence = max([i for i, e in enumerate(indices) if e > 0])
-    index = 0
-    for i in range(target_sentence):
-        index += len(tokenize(data[i][0]))     # add number of words in all sentences preceding target sentence
-    index += indices[target_sentence]          # add of target word in target sentence
-    return sentences, index
 
 
 class Loader(object):
     """Text data loader."""
-    def __init__(self, data_path, vocab_path, batch_size, seq_length):
+    def __init__(self, data_path, vocab_path, batch_size, seq_length, n_pointers=2):
         self.data_path = data_path
         self.batch_size = batch_size
         self.seq_length = seq_length
@@ -96,25 +34,31 @@ class Loader(object):
         self.n_batches = None
         self.x_batches, self.x_lengths, self.y_batches = None, None, None
         self.pointer = 0
+        self.n_pointers = n_pointers
 
         print('Pre-processing data...')
         self.pre_process()
         self.create_batches()
         print('Pre-processed {} lines of data.'.format(self.labels.shape[0]))
 
+    def get(self, something):
+        return self.vocab.get(something, 1)
+
     def pre_process(self):
         """Pre-process data."""
         with open(self.data_path, 'r') as f:
             data = f.readlines()
         # each line in data file is formatted according to [label, text] (e.g. 2 She went home)
-        self.text = [sample[2:].strip() for sample in data]
-        self.labels = np.array([[int(n) for n in re.findall(r'\d+', sample)] for sample in data])
+        self.all = [tokenize(sample.strip()) for sample in data]
+        self.text = [' '.join(sample[self.n_pointers:]) for sample in self.all]
+        self.labels = np.array([sample[:self.n_pointers] for sample in self.all])
         self.embedding = np.zeros((len(self.text), self.seq_length), dtype=int)
         self.lengths = np.zeros(len(self.text), dtype=int)
         for i, sample in enumerate(self.text):
-            tokens = tokenize(self.text[i])
+            tokens = tokenize(self.text[i]) #No need punkt tokenizer
             self.lengths[i] = len(tokens)
-            self.embedding[i] = list(map(self.vocab.get, tokens)) + [0] * (self.seq_length - len(tokens))
+            self.embedding[i] = list(map(self.get, tokens)) + [0] * (self.seq_length - len(tokens))
+
 
     def create_batches(self):
         """Split data into training batches."""
@@ -122,6 +66,7 @@ class Loader(object):
         # truncate training data so it is equally divisible into batches
         self.embedding = self.embedding[:self.n_batches * self.batch_size, :]
         self.lengths = self.lengths[:self.n_batches * self.batch_size]
+        #print (self.labels.shape, self.x_batches.shape)
         self.labels = self.labels[:self.n_batches * self.batch_size, :]
 
         # split training data into equal sized batches
@@ -138,40 +83,14 @@ class Loader(object):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_passages', type=int, default=5000, help='Number of passages to generate.')
-    parser.add_argument('--data_path', type=str, default='./data', help='Where to save training data.')
-    parser.add_argument('--vocab_path', type=str, default='./data/vocab.json', help='Where to save vocabulary.')
+    parser.add_argument('--data_dir', type=str, default='./data', help='Directory in which data is stored.')
+    parser.add_argument('--save_dir', type=str, default='./models', help='Where to save checkpoint models.')
+    parser.add_argument('--n_epochs', type=int, default=100, help='Number of epochs to run.')
+    parser.add_argument('--batch_size', type=int, default=100, help='Batch size.')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for Adam optimizer.')
     args = parser.parse_args(sys.argv[1:])
-
-    # if files at args.data_path exist already, delete it
-    for file in ['train.txt', 'validate.txt', 'test.txt']:
-        path = os.path.join(args.data_path, file)
-        if os.path.exists(path):
-            os.remove(path)
-
-    # write training, validate, test data to txt files; save vocabulary in json file
-    vocab = set()
-    with open(os.path.join(args.data_path, 'train.txt'), 'a') as file:
-        for _ in range(args.n_passages):
-            n_sentences = np.random.randint(1, 5)
-            passage, idx = generate_passage(n_sentences)
-            file.write('{} {}\n'.format(idx, passage))
-            vocab = vocab.union(set(tokenize(passage)))
-
-    with open(os.path.join(args.data_path, 'validate.txt'), 'a') as file:
-        for _ in range(int(args.n_passages/5)):
-            n_sentences = np.random.randint(1, 5)
-            passage, idx = generate_passage(n_sentences)
-            file.write('{} {}\n'.format(idx, passage))
-            vocab = vocab.union(set(tokenize(passage)))
-
-    with open(os.path.join(args.data_path, 'test.txt'), 'a') as file:
-        for _ in range(int(args.n_passages/5)):
-            n_sentences = np.random.randint(1, 5)
-            passage, idx = generate_passage(n_sentences)
-            file.write('{} {}\n'.format(idx, passage))
-            vocab = vocab.union(set(tokenize(passage)))
-
-    with open(args.vocab_path, 'w') as file:
-        vocab_dict = {word: i+2 for i, word in enumerate(list(vocab))}  # reserve 0 for padding, 1 for <start>
-        json.dump(vocab_dict, file)
+    n_pointers = 2
+    MAX_LENGTH = 500
+    vocab_path = os.path.join(args.data_dir, 'vocab.json')
+    training = Loader(os.path.join(args.data_dir, 'train.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)
+    validation = Loader(os.path.join(args.data_dir, 'validate.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)

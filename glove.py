@@ -40,7 +40,10 @@ def embedding_matrix(vocab, embed_vectors, embed_size):
     """
     matrix = np.zeros((len(vocab)+2, embed_size))  # extra rows for padding, <start>
     for word, i in vocab.items():
-        vector = embed_vectors[word]
+        try:
+            vector = embed_vectors[word]
+        except:
+            vector = np.random.rand((50))
         assert vector.size == embed_size, 'All embedding vectors must have same length.'
         matrix[i] = vector
     return matrix
@@ -48,7 +51,7 @@ def embedding_matrix(vocab, embed_vectors, embed_size):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--glove', type=str, default='./models/glove.6B.50d.txt', help='Path to GloVe vectors.')
+    parser.add_argument('--glove', type=str, default='/Users/animeshprasad/PycharmProjects/glove/glove.6B.50d.txt', help='Path to GloVe vectors.')
     parser.add_argument('--emb_size', type=int, default=50, help='Length of embedding vectors.')
     parser.add_argument('--vocab_path', type=str, default='./data/vocab.json', help='Path to vocab file.')
     parser.add_argument('--save_path', type=str, default='./data/word_matrix.npy', help='Where to save word matrix.')

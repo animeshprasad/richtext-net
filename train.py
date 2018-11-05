@@ -13,12 +13,15 @@ from tqdm import tqdm
 
 def train(args):
     # load data
+    n_pointers = 2
+    MAX_LENGTH = 500
+
     vocab_path = os.path.join(args.data_dir, 'vocab.json')
-    training = Loader(os.path.join(args.data_dir, 'train.txt'), vocab_path, args.batch_size, 45)
-    validation = Loader(os.path.join(args.data_dir, 'validate.txt'), vocab_path, args.batch_size, 45)
+    training = Loader(os.path.join(args.data_dir, 'train.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)
+    validation = Loader(os.path.join(args.data_dir, 'validate.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)
 
     # create TensorFlow graph
-    ptr_net = PointerNet(batch_size=args.batch_size, learning_rate=args.learning_rate)
+    ptr_net = PointerNet(batch_size=args.batch_size, learning_rate=args.learning_rate, n_pointers=n_pointers)
     saver = tf.train.Saver()
     best_val_acc = 0
 
@@ -68,7 +71,7 @@ def train(args):
                     saver.restore(sess, os.path.join(args.save_dir, 'ptr_net.ckpt'))
 
         print('Training complete.')
-        print('Best Validation EM: {:.2f}".format(best_val_acc)')
+        print('Best Validation EM: {:.2f}'.format(best_val_acc))
 
 
 if __name__ == '__main__':

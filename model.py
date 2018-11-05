@@ -8,10 +8,10 @@ import tensorflow as tf
 # can be edited (to anything larger than vocab size) if encoding of vocab already uses 0, 1
 END_TOKEN = 0
 START_TOKEN = 1
-
+MAX_LENGTH = 500
 
 class PointerNet(object):
-    def __init__(self, n_pointers=1, batch_size=100, seq_length=45, learning_rate=0.001,
+    def __init__(self, n_pointers=2, batch_size=100, seq_length=MAX_LENGTH, learning_rate=0.001,
                  cell=tf.contrib.rnn.GRUCell, n_layers=3, n_units=50):
         """Creates TensorFlow graph of a pointer network.
 
@@ -46,7 +46,7 @@ class PointerNet(object):
 
         with tf.variable_scope('embeddings'):
             # load pre-trained GloVe embeddings
-            word_matrix = tf.constant(np.load('./data/word_matrix.npy'), dtype=tf.float32)
+            word_matrix = tf.constant(np.load('./data_b/word_matrix.npy'), dtype=tf.float32)
             self.word_matrix = tf.Variable(word_matrix, trainable=True, name='word_matrix')
             # lookup embeddings of inputs & decoder inputs
             self.input_embeds = tf.nn.embedding_lookup(self.word_matrix, self.encoder_inputs)
