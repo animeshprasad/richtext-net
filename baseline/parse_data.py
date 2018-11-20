@@ -11,7 +11,7 @@ DIR = "../../train_test/"
 class DataParser:
 	def __init__(self, outdir=None):
 		self.data_set_citations = pd.read_json(DIR+'data_set_citations.json', encoding='utf-8')
-		self.data_set = pd.read_json(DIR+'data_sets.json', encoding='utf-8')
+		#self.data_set = pd.read_json(DIR+'data_sets.json', encoding='utf-8')
 		self.publications = pd.read_json(DIR+'publications.json', encoding='utf-8')
 
 		self.publications.insert(6, 'full_text', pd.Series)
@@ -48,7 +48,7 @@ class DataParser:
 		#to have more no mention cases
 		pos_neg_sample_ratio = 5
 		pos_count = 0
-		neg_count = 0
+		neg_count = 0 ##didn't find
 		zero_count = 0
 
 		with codecs.open(self.outdir+'golden_data', 'w+') as golden_data:
