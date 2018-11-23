@@ -34,9 +34,18 @@ class DataParser:
         self.publications['full_text'] = full_text_series
 
 
+        self.research_fields = pd.read_csv('sage_research_fields.csv')
+
+        sage_research_methods = json.load(open('sage_research_methods.json'))
+        research_methods = sage_research_methods['@graph']
+        self.research_methods = pd.DataFrame(research_methods)
+
+
+
+
     def get_train_data_full(self):
-        max_length_token = 500
-        pos_neg_sample_ratio = 2 # out of 100
+        max_length_token = 100
+        pos_neg_sample_ratio = 0 # out of 100
 
         with codecs.open(self.outdir + 'golden_data', 'wb') as golden_data:
             for index, row in self.data_set_citations.iterrows():
@@ -68,6 +77,7 @@ class DataParser:
                                         #str(row['publication_id']) + ' ' + str(row['data_set_id']) + ' ' +
                                         str(sample_text_spans.index(mention_text_spans[0]) - splits*(max_length_token/2)) +
                                         ' ' + str(sample_text_spans.index(mention_text_spans[-1]) - splits*(max_length_token/2)) +
+                                        ' ' + str(row['data_set_id']) + ' ' + str(row['publication_id']) +
                                          ' ' + ' '.join(sample_text_tokens[splits*(max_length_token/2):(splits+2)*(max_length_token/2)])
                                         + '\n'
                                     )
@@ -82,9 +92,25 @@ class DataParser:
                             #str(row['publication_id']) + ' ' + str(0) + ' ' +
                             str(0) +
                             ' ' + str(0) +
+                            ' ' + str(row['data_set_id']) + ' ' + str(row['publication_id']) +
                             ' ' + ' '.join(sample_text_tokens[splits * (max_length_token / 2):(splits + 2) * (max_length_token / 2)])
                             + '\n'
                         )
+
+        with codecs.open(self.outdir + 'golden_data', 'rb') as golden_data, \
+            codecs.open(self.outdir + 'train.txt', 'wb') as train_split, \
+            codecs.open(self.outdir + 'validate.txt', 'wb') as validate_split, \
+            codecs.open(self.outdir + 'test.txt', 'wb') as test_split:
+            all_lines = golden_data.readlines()
+            for i, line in enumerate(all_lines):
+                if i%9 == 0:
+                    validate_split.write(line)
+                elif i%10 == 0:
+                    test_split.write(line)
+                else:
+                    train_split.write(line)
+
+
 
 
     def get_vocab(self, start_index=2, min_count=10):
@@ -104,11 +130,9 @@ class DataParser:
 
 
 
-
     def _extract(self, dir_name='files/text/', extension='.txt'):
         current_dir = os.getcwd()
         dir_name = current_dir + '/' + dir_name
-        os.chdir(dir_name)
         full_text = {}
         for item in os.listdir(dir_name):
             if item.endswith(extension):
@@ -125,7 +149,31 @@ class DataParser:
         return full_text
 
 
+class OuputEvaluator:
+
+    def __init__(self, outdir=None):
+        self.outdir = outdir
+
+    # TODO: doc level evaluation here
+
+    def generate_report(self, ground_truth='test.txt', model_out='model_test.txt'):
+        with codecs.open(self.outdir + ground_truth, 'rb') as ground_split, \
+            codecs.open(self.outdir + model_out, 'rb') as model_out_split:
+            true_lines = ground_split.readlines()
+            predict_lines = model_out_split.readlines()
+            #TODO: line by line evaluation here
+
+
+
+
+class OuputParser:
+    #TODO class to produce out json files
+    def __init__(self, outdir=None):
+        self.outdir = outdir
+
+
+
 if __name__ == '__main__':
-    data_parser = DataParser(outdir='/Users/animeshprasad/Desktop/richtext-ptr-net/data/')
-    #data_parser.get_vocab()
+    data_parser = DataParser(outdir='/Users/nus/Desktop/richtext-ptr-net/data/')
+    data_parser.get_vocab()
     data_parser.get_train_data_full()

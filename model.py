@@ -46,7 +46,7 @@ class PointerNet(object):
 
         with tf.variable_scope('embeddings'):
             # load pre-trained GloVe embeddings
-            word_matrix = tf.constant(np.load('./data_b/word_matrix.npy'), dtype=tf.float32)
+            word_matrix = tf.constant(np.load('./data/word_matrix.npy'), dtype=tf.float32)
             self.word_matrix = tf.Variable(word_matrix, trainable=True, name='word_matrix')
             # lookup embeddings of inputs & decoder inputs
             self.input_embeds = tf.nn.embedding_lookup(self.word_matrix, self.encoder_inputs)
