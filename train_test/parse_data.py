@@ -40,12 +40,16 @@ class DataParser:
         research_methods = sage_research_methods['@graph']
         self.research_methods = pd.DataFrame(research_methods)
 
+        print (count, "files loaded.")
 
 
 
-    def get_train_data_full(self):
+    def get_train_data_full(self, neg_ratio):
         max_length_token = 100
-        pos_neg_sample_ratio = 0 # out of 100
+        pos_neg_sample_ratio = neg_ratio # out of 100
+
+        pos_count = 0
+        neg_count = 0
 
         with codecs.open(self.outdir + 'golden_data', 'wb') as golden_data:
             for index, row in self.data_set_citations.iterrows():
@@ -72,6 +76,8 @@ class DataParser:
 
                                     pos_splits.append(splits)
 
+                                    pos_count += 1
+
                                     #TODO Wrapper over full data_b reader
                                     golden_data.write(
                                         #str(row['publication_id']) + ' ' + str(row['data_set_id']) + ' ' +
@@ -96,6 +102,11 @@ class DataParser:
                             ' ' + ' '.join(sample_text_tokens[splits * (max_length_token / 2):(splits + 2) * (max_length_token / 2)])
                             + '\n'
                         )
+
+                        neg_count += 1
+
+        print (pos_count, "mentions added.")
+        print (neg_count, "no mentions added.")
 
         with codecs.open(self.outdir + 'golden_data', 'rb') as golden_data, \
             codecs.open(self.outdir + 'train.txt', 'wb') as train_split, \
@@ -174,6 +185,6 @@ class OuputParser:
 
 
 if __name__ == '__main__':
-    data_parser = DataParser(outdir='/Users/nus/Desktop/richtext-ptr-net/data/')
+    data_parser = DataParser(outdir='../data/')
     data_parser.get_vocab()
-    data_parser.get_train_data_full()
+    data_parser.get_train_data_full(5)
