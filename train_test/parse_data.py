@@ -6,6 +6,13 @@ import os, sys, random
 from nltk.tokenize import  WordPunctTokenizer
 from collections import Counter
 import json, codecs, re
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+import wikipedia
+from gensim.summarization.summarizer import summarize
+from sklearn.metrics.pairwise import linear_kernel
+import json
+
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -41,6 +48,67 @@ class DataParser:
         sage_research_methods = json.load(open('sage_research_methods.json'))
         research_methods = sage_research_methods['@graph']
         self.research_methods = pd.DataFrame(research_methods)
+
+
+        for index, row in self.publications.iterrows():
+            self.research_methods[row["publication_id"]] = pd.Series(np.random.randn(len(self.research_methods)),
+                                                                     index=self.research_methods.index)
+            self.research_fields[row["publication_id"]] = pd.Series(np.random.randn(len(self.research_fields)),
+                                                                     index=self.research_fields.index)
+
+        docs_m = full_text_series.tolist()
+        docs_f = [summarize(docs) for docs in docs_m]
+
+        queries_m = []
+        for index, row in self.research_methods.iterrows():
+            try:
+                a = row.loc['skos:altLabel']
+                b = row.loc['skos:prefLabel']
+                if type(a) == type([]):
+                    a.append(b)
+                elif type(a) != type({}):
+                    a = [b]
+                else:
+                    a = [a]
+                    a.append(b)
+                j = [items["@value"] for items in a]
+                queries_m.append(j)
+            except:
+                queries_m.append([])
+        assert (len(queries_m) == len(self.research_methods))
+
+        queries_f = []
+        for rf in self.research_fields['L3'].tolist():
+            try:
+                #queries_f.append(rf)
+                queries_f.append(wikipedia.page(rf).summary)
+            except:
+                queries_f.append(5 * (' ' + rf))
+        assert (len(queries_f) == len(self.research_fields))
+
+
+        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0, stop_words='english', lowercase=True)
+        tfidf_matrix = tf.fit_transform(docs_f + queries_f)
+        tfidf_matrix_d = tf.fit(docs_f)
+        tfidf_matrix_q = tf.fit(queries_f)
+        cosine_similarities = linear_kernel(tfidf_matrix_d, tfidf_matrix_q).flatten()
+
+        #TODO assign to the DF
+
+        def findall_lower(p, s):
+            i = s.lower().find(p.lower())
+            while i != -1:
+                yield i
+                i = s.lower().find(p.lower(), i + 1)
+
+        for d in docs_m:
+            score = 0
+            for q in queries_m:
+                score += len([i for i in findall_lower(q, d)])
+
+        # TODO assign to the DF
+
+
 
         print (count, "files loaded.")
 
