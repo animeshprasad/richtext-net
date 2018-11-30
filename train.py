@@ -14,7 +14,7 @@ from tqdm import tqdm
 def train(args):
     # load data
     n_pointers = 2
-    MAX_LENGTH = 500
+    MAX_LENGTH = 30
 
     vocab_path = os.path.join(args.data_dir, 'vocab.json')
     training = Loader(os.path.join(args.data_dir, 'train.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='./data', help='Directory in which data is stored.')
     parser.add_argument('--save_dir', type=str, default='./models', help='Where to save checkpoint models.')
     parser.add_argument('--n_epochs', type=int, default=100, help='Number of epochs to run.')
-    parser.add_argument('--batch_size', type=int, default=100, help='Batch size.')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for Adam optimizer.')
     args = parser.parse_args(sys.argv[1:])
     train(args)

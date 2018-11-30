@@ -8,7 +8,7 @@ import tensorflow as tf
 # can be edited (to anything larger than vocab size) if encoding of vocab already uses 0, 1
 END_TOKEN = 0
 START_TOKEN = 1
-MAX_LENGTH = 500
+MAX_LENGTH = 30
 
 class PointerNet(object):
     def __init__(self, n_pointers=2, batch_size=100, seq_length=MAX_LENGTH, learning_rate=0.001,

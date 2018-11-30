@@ -35,6 +35,7 @@ class Loader(object):
         self.x_batches, self.x_lengths, self.y_batches = None, None, None
         self.pointer = 0
         self.n_pointers = n_pointers
+        self.data_start = 4
 
         print('Pre-processing data...')
         self.pre_process()
@@ -50,7 +51,7 @@ class Loader(object):
             data = f.readlines()
         # each line in data file is formatted according to [label, text] (e.g. 2 She went home)
         self.all = [tokenize(sample.strip()) for sample in data]
-        self.text = [' '.join(sample[self.n_pointers:]) for sample in self.all]
+        self.text = [' '.join(sample[self.data_start:]) for sample in self.all]
         self.labels = np.array([sample[:self.n_pointers] for sample in self.all])
         self.embedding = np.zeros((len(self.text), self.seq_length), dtype=int)
         self.lengths = np.zeros(len(self.text), dtype=int)
@@ -86,11 +87,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='./data', help='Directory in which data is stored.')
     parser.add_argument('--save_dir', type=str, default='./models', help='Where to save checkpoint models.')
     parser.add_argument('--n_epochs', type=int, default=100, help='Number of epochs to run.')
-    parser.add_argument('--batch_size', type=int, default=100, help='Batch size.')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for Adam optimizer.')
     args = parser.parse_args(sys.argv[1:])
     n_pointers = 2
-    MAX_LENGTH = 500
+    MAX_LENGTH = 100
     vocab_path = os.path.join(args.data_dir, 'vocab.json')
     training = Loader(os.path.join(args.data_dir, 'train.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)
     validation = Loader(os.path.join(args.data_dir, 'validate.txt'), vocab_path, args.batch_size, MAX_LENGTH, n_pointers=n_pointers)
