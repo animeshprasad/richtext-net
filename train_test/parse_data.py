@@ -11,6 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import wikipedia
 from gensim.summarization.summarizer import summarize
 from sklearn.metrics.pairwise import linear_kernel
+from sklearn.metrics import precision_recall_fscore_support
 import json
 
 
@@ -343,7 +344,73 @@ class OuputEvaluator:
             codecs.open(self.outdir + model_out, 'rb') as model_out_split:
             true_lines = ground_split.readlines()
             predict_lines = model_out_split.readlines()
-            #TODO: line by line evaluation here
+
+            def compute_partial(s1,s2,e1,e2):
+                tp = min(max(s1,s2) - min(e1, e2), 0)
+                total_predicted = (e1-s1) + (e2-s2)
+                try:
+                    partial_accuracy = float(tp)/total_predicted
+                except:
+                    partial_accuracy = 0
+                try:
+                    partial_precision = float(tp)/ (e2-s2)
+                except:
+                    partial_precision = 0
+                try:
+                    partial_recall = float(tp)/ (e1-s1)
+                except:
+                    partial_recall = 0
+                try:
+                    partial_fscore = 2 * (partial_precision * partial_recall) / (partial_precision + partial_recall)
+                except:
+                    partial_fscore = 0
+                return partial_accuracy, partial_precision, partial_recall, partial_fscore
+
+            def match_report():
+                true_mention = []
+                predict_mention = []
+                true_dataset = []
+                predict_dataset = []
+
+                partial_accuracy = []
+                partial_precision = []
+                partial_recall = []
+                partial_fscore = []
+
+                for trues, predicts in zip(true_lines, predict_lines):
+                    trues = [int(t) for t in trues.split()[:4]]
+                    predicts = [int(t) for t in predicts.split()[:4]]
+                    print (trues, predicts)
+
+                    if predicts[0] != -1:
+                        if trues[0] == predicts[0] and trues[1] == predicts[1]:
+                            true_mention.append(1)
+                            predict_mention.append(1)
+                        else:
+                            predict_mention.append(0)
+
+                        a,b,c,d = compute_partial(trues[0],predicts[0],trues[1],predicts[1])
+                        partial_accuracy.append(a)
+                        partial_precision.append(b)
+                        partial_recall.append(c)
+                        partial_fscore.append(d)
+
+                    if predicts[2] != -1:
+                        true_dataset.append(trues[2])
+                        predict_dataset.append(predicts[2])
+
+                P, R, F, S = precision_recall_fscore_support(true_mention, predict_mention)
+                print(P, R, F)
+                #print (P[1], R[1], F[1])
+
+                P, R, F, S = precision_recall_fscore_support(true_dataset, predict_dataset)
+                print(np.average(P), np.average(R), np.average(F))
+
+                A, P, R, F = np.average(partial_accuracy), np.average(partial_precision), \
+                             np.average(partial_recall), np.average(partial_fscore)
+                print (P, R, F, A)
+
+            match_report()
 
 
 
