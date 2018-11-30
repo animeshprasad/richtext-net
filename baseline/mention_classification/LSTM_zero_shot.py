@@ -11,53 +11,59 @@ import json
 import pandas as pd 
 import os
 
-data_set = pd.read_json('../../train_test/data_sets.json', encoding='utf-8')
+def data_loader(file):
+    with open(file, 'r') as f:
+        sents = []
+        labels = []
+        for line in f:
+            line = line.strip().split()
+            labels.append(int(line[2]))
+            sents.append(' '.join(line[4:]))
+    return sents, labels
+
+
+train_sents, train_labels = data_loader("../../data/train.txt")
+val_sents, val_labels = data_loader("../../data/validate.txt")
+test_sents, test_labels = data_loader("../../data/test.txt")
+
+
+data_set = pd.read_json('../../../train_test/data_sets.json', encoding='utf-8')
 #note: dataset_id = index + 1
 data_description = data_set["description"].values
 
-DIR = '../../data/golden_data'
-
-X = []
-Y = []
-
-with open(DIR, 'r') as f:
-	for line in f:
-		line = line.strip().split()
-		Y.append(int(line[0]))
-		X.append(' '.join(line[1:]))
-
-print (len(X), 'sampled loaded')
-
-##X: strings of texts
-##Y: dataset id mentioned in that string
 
 # Add a sentence for no mention case
 data_description = list(data_description)
 data_description.insert(0, "There is no mention.")
 
-maxlen = 200
-vocab_size = 50000 ##more than 80K unique tokens
+maxlen = 100
+#vocab_size = 45000 ##more than 80K unique tokens
 EMB_DIM = 50
 HIDDEN_DIM = 256
 EPOCHS = 10
 NEG_RATIO = 4
 BATCH_SIZE = 10
 DATASET_CLASS = len(data_description) 
-MODEL_NAME = "LSTM"
-
 #actual batch size = BATCH_SIZE * (1 + NEG_RATIO)
 
 
-tokenizer = Tokenizer(num_words=vocab_size)
-tokenizer.fit_on_texts(X+data_description)
-X_seq = tokenizer.texts_to_sequences(X)
-des_seq = tokenizer.texts_to_sequences(list(data_description))
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(train_sents)
+X_train = tokenizer.texts_to_sequences(train_sents)
+X_val = tokenizer.texts_to_sequences(val_sents)
+X_test = tokenizer.texts_to_sequences(test_sents)
+description = tokenizer.texts_to_sequences(data_description)
 
 word_index = tokenizer.word_index
+vocab_size = len(word_index) + 1
 
-data = pad_sequences(X_seq, maxlen=maxlen)
-des = pad_sequences(des_seq, maxlen=maxlen)
-labels = np.asarray(Y)
+X_train = pad_sequences(X_train, maxlen=maxlen)
+X_val = pad_sequences(X_val, maxlen=maxlen)
+X_test = pad_sequences(X_test, maxlen=maxlen)
+des = pad_sequences(description, maxlen=maxlen)
+Y_train = np.asarray(train_labels)
+Y_val = np.asarray(val_labels)
+Y_test = np.asarray(test_labels)
 
 ##randomly shuffle data and labels
 ##np.random.seed(0)
@@ -67,12 +73,6 @@ np.random.shuffle(indices)
 data = data[indices]
 labels = labels[indices] 
 
-
-## I set apart the last 2000 samples as test set
-test_data = data[-2000 : ]
-test_labels = labels[-2000 : ]
-data = data[ : -2000]
-labels = labels[ : -2000]
 
 ## I am not using Glove here, may get better results with Glove
 def build_model():
@@ -191,12 +191,12 @@ def evaluate(outputs, targets):
 
 if __name__ == '__main__':
 	model = build_model()
-	fit(model, data, labels)
+	fit(model, X_train, Y_train)
 
 	model.load_weights(get_weight_path('../../models'))
-	scores, labels = inference(test_data, des)
+	scores, labels = inference(X_test, des)
 
-	p, r, f = evaluate(labels, test_labels)
+	p, r, f = evaluate(labels, Y_test)
 
 
 
