@@ -113,17 +113,28 @@ with open('../../outputs/BiLSTM_preds', 'w') as fout:
 			data_id = int(sent[2])
 			pub_id = int(sent[3])
 
+			first = 0
 			j = 0
+			string = ''
+			no_mention = True
 			while j<len(preds[i]):
 				while j<len(preds[i]) and preds[i][j]== 0:
 					j+=1
 				if j<len(preds[i]) and preds[i][j] == 1:
+					no_mention=False
 					start = j
 					while j+1<len(preds[i]) and preds[i][j+1]==1:
 						j+=1
 					end = j 
-					fout.write(str(start)+' '+str(end)+' '+str(data_id)+' '+str(pub_id)+'\n')
+					if first > 0:
+						string += " | "
+					string += (str(start)+' '+str(end)+' '+str(data_id)+' '+str(pub_id))
 					j+=1
+					first += 1
+			if no_mention:
+				fout.write("0 0 0 "+str(pub_id)+'\n')
+			else:
+				fout.write(string+'\n')
 
 
 
