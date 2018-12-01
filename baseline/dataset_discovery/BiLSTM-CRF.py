@@ -16,11 +16,8 @@ val_sents = get_sents("../../data/validate.txt")
 test_sents = get_sents("../../data/test.txt")
 
 
-def sent2features(sent):
-	return [word2features(sent, i) for i in range(len(sent))]
-
 def sent2labels(sent):
-	return [label for token, label in sent]
+	return [int(label) for token, label in sent]
 
 def sent2tokens(sent):
 	return [token for token, label in sent]
@@ -32,16 +29,41 @@ Y_val = [sent2labels(s) for s in val_sents]
 X_test = [sent2tokens(s) for s in test_sents]
 Y_test = [sent2labels(s) for s in test_sents]
 
+
+##load glove
+embedding_index = {}
+f = open('../glove.6B.50d.txt')
+for line in f:
+	values = line.split()
+	word = values[0]
+	coefs = np.asarray(values[1:], dtype='float32')
+	embedding_index[word] = coefs
+f.close()
+
 tokenizer = Tokenizer()
-tokenizer.fit_on_texts(X_train)
+tokenizer.fit_on_texts(X_train+X_val+X_test)
 word_index = tokenizer.word_index
+
+##hyperparameters
 vocab_size = len(word_index)+1
+maxlen = 100
+emb_dim = 50
+
+embedding_matrix = np.zeros((vocab_size, emb_dim))
+counter = 0
+for word, i in word_index.items():
+	embedding_vector = embedding_index.get(word)
+	if embedding_vector is not None:
+		embedding_matrix[i] = embedding_vector
+		counter += 1
+	else:
+		embedding_matrix[i] = np.random.randn(emb_dim)
+print ("{}/{} words covered in glove".format(counter, vocab_size))
 
 X_train = tokenizer.texts_to_sequences(X_train)
 X_val = tokenizer.texts_to_sequences(X_val)
 X_test = tokenizer.texts_to_sequences(X_test)
 
-maxlen = 100
 
 X_train = pad_sequences(X_train, maxlen=maxlen)
 X_val = pad_sequences(X_val, maxlen=maxlen)
@@ -57,9 +79,8 @@ Y_val = np.expand_dims(Y_val, axis=2)
 Y_test = np.expand_dims(Y_test, axis=2)
 
 ##build model
-emb_dim = 50
 input = Input(shape=(maxlen,))
-model = Embedding(vocab_size, emb_dim, input_length=maxlen)(input)
+model = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
 model = Bidirectional(LSTM(100, return_sequences=True, recurrent_dropout=0.2))(model)    
 model = TimeDistributed(Dense(50, activation='relu'))(model)
 ##use CRF instead of Dense

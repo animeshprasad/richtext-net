@@ -1,4 +1,4 @@
-#This script implements a BiLSTM model
+#This script implements a purely glove embedding based CRF.
 import pandas as pd 
 import numpy as np 
 from data_reader import *
@@ -8,14 +8,13 @@ from keras.models import Model, Input
 from keras.layers import LSTM, Embedding, Dense, TimeDistributed, Dropout, Bidirectional
 from keras.callbacks import EarlyStopping
 from sklearn import metrics 
+from keras_contrib.layers import CRF
+import keras
 
 train_sents = get_sents("../../data/train.txt")
 val_sents = get_sents("../../data/validate.txt")
 test_sents = get_sents("../../data/test.txt")
 
-
-def sent2features(sent):
-	return [word2features(sent, i) for i in range(len(sent))]
 
 def sent2labels(sent):
 	return [int(label) for token, label in sent]
@@ -82,24 +81,29 @@ Y_test = np.expand_dims(Y_test, axis=2)
 ##build model
 input = Input(shape=(maxlen,))
 model = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
-model = Dropout(0.1)(model)
-model = Bidirectional(LSTM(100, return_sequences=True, recurrent_dropout=0.1))(model)
-out = TimeDistributed(Dense(1, activation='sigmoid'))(model)
+##use CRF instead of Dense
+crf = CRF(2)
+out = crf(model)
 
 model = Model(input, out)
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
+
+
+Y_train_2 = keras.utils.to_categorical(Y_train)
+Y_val_2 = keras.utils.to_categorical(Y_val)
+Y_test_2 = keras.utils.to_categorical(Y_test)
+
+model.compile(optimizer='adam', loss=crf.loss_function, metrics=[crf.accuracy]) 
 earlyStop = [EarlyStopping(monitor='val_loss', patience=1)]
-history = model.fit(X_train, Y_train, batch_size=64, epochs=10, validation_data=(X_val, Y_val), 
-	callbacks=earlyStop) 
+history = model.fit(X_train, Y_train_2, batch_size=64, epochs=10, 
+                   validation_data=(X_val, Y_val_2), callbacks=earlyStop)
 
 
 preds = model.predict(X_test)
-test = [[1 if y>=0.5 else 0 for y in x] for x in preds]
+test = [[np.argmax(y) for y in x] for x in preds]
 test_arr = np.asarray(test)
 test = np.reshape(test_arr, (-1))
-target = np.reshape(Y_test, (-1))
 
-print (metrics.precision_recall_fscore_support(target, test, average=None,
+print (metrics.precision_recall_fscore_support(np.reshape(Y_test,(-1)), test, average=None,
                                               labels=[0, 1]))
 
 

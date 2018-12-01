@@ -1,6 +1,10 @@
+## This script implements a purely feature based CRF.
 import pandas as pd 
 import numpy as np 
 from data_reader import *
+from sklearn_crfsuite import CRF 
+from sklearn_crfsuite import metrics
+
 
 train_sents = get_sents("../../data/train.txt")
 val_sents = get_sents("../../data/validate.txt")
@@ -46,18 +50,19 @@ def word2features(sent, i):
 def sent2features(sent):
     return [word2features(sent, i) for i in range(len(sent))]
 
+##CRF takes string as labels
 def sent2labels(sent):
     return [label for token, label in sent]
 
 def sent2tokens(sent):
     return [token for token, label in sent]
 
+##labels are strings
 X_train = [sent2features(s) for s in train_sents]
 Y_train = [sent2labels(s) for s in train_sents]
 X_test = [sent2features(s) for s in test_sents]
 Y_test = [sent2labels(s) for s in test_sents]
 
-from sklearn_crfsuite import CRF 
 
 crf = CRF(algorithm='lbfgs',
           c1=0.1,
@@ -67,13 +72,12 @@ crf = CRF(algorithm='lbfgs',
 
 crf.fit(X_train, Y_train)
 
-from sklearn_crfsuite import metrics
 
 labels = list(crf.classes_)
 y_pred = crf.predict(X_test)
 ##average F1
-metrics.flat_f1_score(Y_test, y_pred,
-                      average='weighted', labels=labels)
+# metrics.flat_f1_score(Y_test, y_pred,
+#                       average='weighted', labels=labels)
 
 sorted_labels = sorted(
     labels,
@@ -82,16 +86,6 @@ sorted_labels = sorted(
 print(metrics.flat_classification_report(
     Y_test, y_pred, labels=sorted_labels, digits=3
 ))
-
-
-
-
-
-
-
-
-
-
 
 
 

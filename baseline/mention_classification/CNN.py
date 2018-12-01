@@ -13,14 +13,14 @@ import pandas as pd
 import os
 
 def data_loader(file):
-    with open(file, 'r') as f:
-        sents = []
-        labels = []
-        for line in f:
-            line = line.strip().split()
-            labels.append(int(line[2]))
-            sents.append(' '.join(line[4:]))
-    return sents, labels
+	with open(file, 'r') as f:
+		sents = []
+		labels = []
+		for line in f:
+			line = line.strip().split()
+			labels.append(int(line[2]))
+			sents.append(' '.join(line[4:]))
+	return sents, labels
 
 
 train_sents, train_labels = data_loader("../../data/train.txt")
@@ -40,7 +40,7 @@ data_description.insert(0, "There is no mention.")
 
 maxlen = 100
 #vocab_size = 40000 ##more than 80K unique tokens
-EMB_DIM = 50
+emb_dim = 50
 HIDDEN_DIM = 256
 EPOCHS = 10  ## train more epochs with GPU, it takes 1h per epoch on my CPU
 NEG_RATIO = 3
@@ -50,16 +50,37 @@ MODEL_NAME = "CNN"
 
 #actual batch size = BATCH_SIZE * (1 + NEG_RATIO)
 
+##load glove
+embedding_index = {}
+f = open('../glove.6B.50d.txt')
+for line in f:
+	values = line.split()
+	word = values[0]
+	coefs = np.asarray(values[1:], dtype='float32')
+	embedding_index[word] = coefs
+f.close()
 
-###NOT using dataset info anymore
+
 tokenizer = Tokenizer()
-tokenizer.fit_on_texts(train_sents)
+tokenizer.fit_on_texts(train_sents+val_sents+test_sents)
 X_train = tokenizer.texts_to_sequences(train_sents)
 X_val = tokenizer.texts_to_sequences(val_sents)
 X_test = tokenizer.texts_to_sequences(test_sents)
 
 word_index = tokenizer.word_index
-print ("Found %s unique tokens."%len(word_index))
+##hyperparameters
+vocab_size = len(word_index)+1
+
+embedding_matrix = np.zeros((vocab_size, emb_dim))
+counter = 0
+for word, i in word_index.items():
+	embedding_vector = embedding_index.get(word)
+	if embedding_vector is not None:
+		embedding_matrix[i] = embedding_vector
+		counter += 1
+	else:
+		embedding_matrix[i] = np.random.randn(emb_dim)
+print ("{}/{} words covered in glove".format(counter, vocab_size))
 
 
 
@@ -83,18 +104,17 @@ X_train = X_train[indices]
 Y_train = Y_train[indices] 
 
 
-vocab_size = len(word_index) + 1
 def build_model():
-    #CNN model, 1D conv
+	#CNN model, 1D conv
 	model = Sequential()
-	model.add(layers.Embedding(vocab_size, EMBED_DIM, input_length=maxlen))
+	model.add(layers.Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False))
 	model.add(layers.Conv1D(32, 7, activation='relu'))
 	model.add(layers.MaxPooling1D(5))
 	model.add(layers.Conv1D(32, 7, activation='relu'))
 	model.add(layers.GlobalMaxPooling1D())
-	model.add(layers.Dense(total_class+1, activation="softmax"))
+	model.add(layers.Dense(DATASET_CLASS, activation="sigmoid"))
 	model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    return model 
+	return model 
 
 model = build_model()
 
@@ -105,10 +125,10 @@ callbacks_list = [
 ]
 
 history = model.fit(X_train, Y_train, 
-                    epochs=EPOCHS,
-                    batch_size=128,
-                    validation_data=(X_val, Y_val),
-                    callbacks=callbacks_list)
+					epochs=EPOCHS,
+					batch_size=128,
+					validation_data=(X_val, Y_val),
+					callbacks=callbacks_list)
 
 import matplotlib.pyplot as plt
 %matplotlib inline
