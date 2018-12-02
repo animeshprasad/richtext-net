@@ -28,7 +28,7 @@ val_sents, val_labels = data_loader("../../data/validate.txt")
 test_sents, test_labels = data_loader("../../data/test.txt")
 
 
-data_set = pd.read_json('../../../train_test/data_sets.json', encoding='utf-8')
+data_set = pd.read_json('../../train_test/data_sets.json', encoding='utf-8')
 #note: dataset_id = index + 1
 data_description = data_set["description"].values
 
@@ -52,7 +52,7 @@ MODEL_NAME = "LSTM"
 
 ##load glove
 embedding_index = {}
-f = open('../glove.6B.50d.txt')
+f = open('../../glove/glove.6B.50d.txt')
 for line in f:
     values = line.split()
     word = values[0]
@@ -133,31 +133,31 @@ history = model.fit(X_train, Y_train,
                     validation_data=(X_val, Y_val),
                     callbacks=callbacks_list)
 
-import matplotlib.pyplot as plt
-%matplotlib inline
-
-acc = history.history['acc']
-val_acc = history.history['val_acc']
-loss = history.history['loss']
-val_loss = history.history['val_loss']
-
-epochs = range(1, len(acc)+1)
-
-plt.plot(epochs, acc, 'r', label='Training accuracy')
-plt.plot(epochs, val_acc, 'b', label='Validation accuracy')
-plt.title('Training and validation accracy')
-plt.legend()
-
-plt.figure()
-
-plt.plot(epochs, loss, 'r', label='Training loss')
-plt.plot(epochs, val_loss, 'b', label='Validation loss')
-plt.title('Trianing and validation loss')
-plt.legend()
-
-plt.show()
-
-print ('BiLSTM test accuracy: ', model.evaluate(X_test, Y_test))
+# import matplotlib.pyplot as plt
+# %matplotlib inline
+#
+# acc = history.history['acc']
+# val_acc = history.history['val_acc']
+# loss = history.history['loss']
+# val_loss = history.history['val_loss']
+#
+# epochs = range(1, len(acc)+1)
+#
+# plt.plot(epochs, acc, 'r', label='Training accuracy')
+# plt.plot(epochs, val_acc, 'b', label='Validation accuracy')
+# plt.title('Training and validation accracy')
+# plt.legend()
+#
+# plt.figure()
+#
+# plt.plot(epochs, loss, 'r', label='Training loss')
+# plt.plot(epochs, val_loss, 'b', label='Validation loss')
+# plt.title('Trianing and validation loss')
+# plt.legend()
+#
+# plt.show()
+#
+# print ('BiLSTM test accuracy: ', model.evaluate(X_test, Y_test))
 
 
 

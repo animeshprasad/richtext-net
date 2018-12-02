@@ -1,9 +1,11 @@
  This folder contains the training samples i.e. train, test and validate files:
  start_id end_id dataset_id file_id <TEXT>
 
- start_id  = end_id 0 if not present
+ start_id  = end_id =  0 if not present
+ dataset_id = 0 if not present
 
 
  This folder should be the place to write the output as well from the models modelname_out_test and modelname_out_validate:
  pred_start_id pred_end_id pred_dataset_id file_id <TEXT>
-
+ start_id  = end_id =  -1 if model doesn't output mention
+ dataset_id = -1 if model doesn't output dataset classification

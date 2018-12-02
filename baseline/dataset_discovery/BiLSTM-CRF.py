@@ -12,15 +12,17 @@ from keras_contrib.layers import CRF
 import keras
 
 train_sents = get_sents("../../data/train.txt")
-val_sents = get_sents("../../data/validate.txt")
-test_sents = get_sents("../../data/test.txt")
+train_sents2 = get_sents("../../data/validate.txt")
+train_sents = train_sents + train_sents2
+val_sents = get_sents("../../data/test.txt")
+test_sents = get_sents("../../data/golden_test")
 
 
 def sent2labels(sent):
 	return [int(label) for token, label in sent]
 
 def sent2tokens(sent):
-	return [token for token, label in sent]
+	return [token.lower() for token, label in sent]
 
 X_train = [sent2tokens(s) for s in train_sents]
 Y_train = [sent2labels(s) for s in train_sents]
@@ -32,7 +34,7 @@ Y_test = [sent2labels(s) for s in test_sents]
 
 ##load glove
 embedding_index = {}
-f = open('../glove.6B.50d.txt')
+f = open('../../glove/glove.6B.50d.txt')
 for line in f:
 	values = line.split()
 	word = values[0]
@@ -46,7 +48,7 @@ word_index = tokenizer.word_index
 
 ##hyperparameters
 vocab_size = len(word_index)+1
-maxlen = 100
+maxlen = 30
 emb_dim = 50
 
 embedding_matrix = np.zeros((vocab_size, emb_dim))
@@ -81,8 +83,8 @@ Y_test = np.expand_dims(Y_test, axis=2)
 ##build model
 input = Input(shape=(maxlen,))
 model = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
-model = Bidirectional(LSTM(100, return_sequences=True, recurrent_dropout=0.2))(model)    
-model = TimeDistributed(Dense(50, activation='relu'))(model)
+model = Bidirectional(LSTM(100, return_sequences=True, recurrent_dropout=0.2))(model)
+model = TimeDistributed(Dropout(Dense(50, activation='relu')))(model)
 ##use CRF instead of Dense
 crf = CRF(2)
 out = crf(model)
@@ -111,8 +113,8 @@ print (metrics.precision_recall_fscore_support(np.reshape(Y_test,(-1)), test, av
 
 preds = test_arr
 ##record the prediceted start and end index
-with open('../../outputs/BiLSTM_CRF_preds', 'w') as fout:
-	with open('../../data/test.txt', 'r') as test:
+with open('../../output/BiLSTM_CRF_preds', 'w') as fout:
+	with open('../../data/golden_test', 'r') as test:
 		test_list = test.readlines()
 		for i in range(len(preds)):
 			sent = test_list[i].strip().split()

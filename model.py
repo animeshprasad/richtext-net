@@ -88,6 +88,10 @@ class PointerNet(object):
             for i in range(n_pointers):
                 loss += tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels[i], logits=pointers[i])
                 equal.append(tf.equal(self.pointers[i], labels[i]))
+            self.outs_ptr0 = pointers[0]
+            self.outs_ptr1 = pointers[1]
+            self.labels0 = labels[0]
+            self.labels1 = labels[1]
             self.loss = tf.reduce_mean(loss)
             self.correct = tf.cast(tf.stack(equal), tf.float32)
             self.all_correct = tf.cast(tf.equal(tf.reduce_sum(self.correct, axis=0), n_pointers), tf.float32)
