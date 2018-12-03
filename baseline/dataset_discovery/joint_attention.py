@@ -47,6 +47,7 @@ data_set = pd.read_json('../../../train_test/data_sets.json', encoding='utf-8')
 #note: dataset_id = index + 1
 data_description = data_set["description"].values
 
+
 maxlen = 100
 emb_dim = 50
 HIDDEN_DIM = 256
@@ -137,28 +138,27 @@ Y2_train = keras.utils.to_categorical(Y2_train, num_classes=DATASET_CLASS)
 Y2_val = keras.utils.to_categorical(Y2_val, num_classes=DATASET_CLASS)
 Y2_test = keras.utils.to_categorical(Y2_test, num_classes=DATASET_CLASS)
 
-##combined target
-Y_train_com = [[Y_train[i], Y2_train[i]] for i in range(len(Y_train))]
-Y_val_com = [[Y_val[i], Y2_val[i]] for i in range(len(Y_val))]
-Y_test_com = [[Y_test[i], Y2_test[i]] for i in range(len(Y_test))]
-
 ##build model
 input = Input(shape=(maxlen,))
 emb = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
 
-[lstm_seq, state_h_fw, state_h_bw, state_c_fw, state_c_bw] = Bidirectional(LSTM(100, return_sequences=True, return_state=True, recurrent_dropout=0.2))(emb) 
-state_h = layers.Concatenate(axis=-1)([state_h_fw, state_h_bw])
-labels = TimeDistributed(Dense(50, activation='relu'))(lstm_seq)
+[lstm_seq, state_h_fw, state_h_bw, state_c_fw, state_c_bw] = Bidirectional(LSTM(100, return_sequences=True, return_state=True, recurrent_dropout=0.2))(emb)
+##lstm_seq: (None, maxlen, 2*hidden_dim)
+label_attn = TimeDistributed(Dense(200, activation='relu'))(lstm_seq)
+##element wise multiply by attention
+weighted_vec = layers.Multiply()([label_attn, lstm_seq])
 ##use CRF instead of Dense
 crf = CRF(2)
-mention = crf(labels)
+mention = crf(label_attn)
 
-data_id = Dense(DATASET_CLASS, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(state_h)
+dataset = Bidirectional(LSTM(100, recurrent_dropout=0.2))(weighted_vec)
+data_id = Dense(DATASET_CLASS, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(dataset)
+
 model = Model(input, [mention, data_id])
 
 model.compile(optimizer='adam', loss=[crf.loss_function, 'categorical_crossentropy'], metrics=['accuracy']) 
-history = model.fit(X_train, Y_train_com, batch_size=64, epochs=10, 
-                   validation_data=(X_val, Y_val_com))
+history = model.fit(X_train, [Y_train, Y2_train], batch_size=64, epochs=10, 
+                   validation_data=(X_val, [Y_val, Y2_val]))
 
 
 [preds, data_id] = model.predict(X_test)
@@ -173,7 +173,7 @@ print (metrics.precision_recall_fscore_support(np.reshape(Y_test_arr,(-1)), test
 ids = [np.argmax(a) for a in data_id]
 preds = test_arr
 ##record the prediceted start and end index
-with open('../../outputs/joint_preds', 'w') as fout:
+with open('../../outputs/joint_attention_preds', 'w') as fout:
 	with open('../../data/test.txt', 'r') as test:
 		test_list = test.readlines()
 		for i in range(len(preds)):
@@ -208,6 +208,23 @@ with open('../../outputs/joint_preds', 'w') as fout:
 				fout.write("0 0 0 "+str(pub_id)+'\n')
 			else:
 				fout.write(string+'\n')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
