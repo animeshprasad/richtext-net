@@ -157,7 +157,7 @@ history = model.fit(X_train, Y_train,
 #
 # plt.show()
 #
-# print ('BiLSTM test accuracy: ', model.evaluate(X_test, Y_test))
+print ('BiLSTM test accuracy: ', model.evaluate(X_test, Y_test))
 
 
 
