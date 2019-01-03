@@ -233,6 +233,8 @@ long_men.shape
 # In[76]:
 
 
+# not really zero-shot because you need mention vector for dataset
+## TODO: modify to joint model (add a sequence labeling on top of LSTM)
 def build_model3():
     embedding_layer = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)
     article_input = Input(shape=(maxlen,), dtype='int32')
@@ -283,42 +285,44 @@ def build_model3():
 
 
 
-def build_model2():
-    embedding_layer = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)
-    article_input = Input(shape=(maxlen,), dtype='int32')
-    article_emb = embedding_layer(article_input)
-    article_lstm = LSTM(HIDDEN_DIM, dropout=0.2, recurrent_dropout=0.3)
-    article_vector = article_lstm(article_emb)
+# def build_model2():
+#     embedding_layer = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)
+#     article_input = Input(shape=(maxlen,), dtype='int32')
+#     article_emb = embedding_layer(article_input)
+#     article_lstm = LSTM(HIDDEN_DIM, dropout=0.2, recurrent_dropout=0.3)
+#     article_vector = article_lstm(article_emb)
 
-    embedding_layer2 = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=mention_len,
-                                 trainable=False)
-    dataset_lstm = LSTM(HIDDEN_DIM, dropout=0.2, recurrent_dropout=0.3)
+#     embedding_layer2 = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=mention_len,
+#                                  trainable=False)
+#     dataset_lstm = LSTM(HIDDEN_DIM, dropout=0.2, recurrent_dropout=0.3)
 
-    mentions = []
-    emb = []
-    dataset_vector=[]
-    for i in range(long_men.shape[0]):
-        mentions.append(Input(batch_shape=(mention_len, ), dtype='int32'))
-        emb.append(embedding_layer2(mentions[-1]))
-        dataset_vector = dataset_lstm(emb[-1])
+#     mentions = []
+#     emb = []
+#     dataset_vector=[]
+#     for i in range(long_men.shape[0]):
+#         mentions.append(Input(batch_shape=(mention_len, ), dtype='int32'))
+#         emb.append(embedding_layer2(mentions[-1]))
+#         dataset_vector = dataset_lstm(emb[-1])
 
-    #
-    # preds = Lambda(dot)([article_vector, mention_vec])
-    # ##shape: (batch_size, DATASET_CLASS)
+#     #
+#     # preds = Lambda(dot)([article_vector, mention_vec])
+#     # ##shape: (batch_size, DATASET_CLASS)
 
-    output = Dense(DATASET_CLASS, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(article_lstm)
-    ##Just to add a layer of sigmoid
+#     output = Dense(DATASET_CLASS, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(article_lstm)
+#     ##Just to add a layer of sigmoid
 
-    model = Model( long_men, output)
+#     model = Model( long_men, output)
 
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    return model
+#     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+#     return model
 
+
+
+# similar to model3 but with LSTM instead of CNN
 def build_model():
     embedding_layer = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)
     article_input = Input(shape=(maxlen,), dtype='int32')
     article_emb = embedding_layer(article_input)
-
     
     article_lstm = LSTM(HIDDEN_DIM, dropout=0.2, recurrent_dropout=0.3)
     article_vector = article_lstm(article_emb)

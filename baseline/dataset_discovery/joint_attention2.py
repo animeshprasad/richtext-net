@@ -161,8 +161,6 @@ def attention_3d_block(inputs):
 
 
 
-
-
 ##build model
 input = Input(shape=(maxlen,))
 emb = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)

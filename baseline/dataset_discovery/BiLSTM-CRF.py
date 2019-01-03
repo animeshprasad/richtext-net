@@ -12,10 +12,8 @@ from keras_contrib.layers import CRF
 import keras
 
 train_sents = get_sents("../../data/train.txt")
-train_sents2 = get_sents("../../data/validate.txt")
-train_sents = train_sents + train_sents2
-val_sents = get_sents("../../data/test.txt")
-test_sents = get_sents("../../data/golden_test")
+val_sents = get_sents("../../data/validate.txt")
+test_sents = get_sents("../../data/test.txt")
 
 
 def sent2labels(sent):
@@ -84,7 +82,8 @@ Y_test = np.expand_dims(Y_test, axis=2)
 input = Input(shape=(maxlen,))
 model = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
 model = Bidirectional(LSTM(100, return_sequences=True, recurrent_dropout=0.2))(model)
-model = TimeDistributed(Dropout(Dense(50, activation='relu')))(model)
+model = TimeDistributed(Dense(50, activation='relu'))(model)
+model = TimeDistributed(Dropout(0.2))(model)
 ##use CRF instead of Dense
 crf = CRF(2)
 out = crf(model)
@@ -114,7 +113,7 @@ print (metrics.precision_recall_fscore_support(np.reshape(Y_test,(-1)), test, av
 preds = test_arr
 ##record the prediceted start and end index
 with open('../../output/BiLSTM_CRF_preds', 'w') as fout:
-	with open('../../data/golden_test', 'r') as test:
+	with open('../../data/test.txt', 'r') as test:
 		test_list = test.readlines()
 		for i in range(len(preds)):
 			sent = test_list[i].strip().split()
