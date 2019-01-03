@@ -5,6 +5,7 @@ def discovery_exact_match(pred_file, truth_file):
             pred_list = fp.readlines()
             true_list = ft.readlines()
             assert len(pred_list) == len(true_list), "Test cases mismatch"
+            total_preds = 0
             total_n = len(pred_list)
             correct = 0
 
@@ -16,10 +17,11 @@ def discovery_exact_match(pred_file, truth_file):
                 preds = [(int(p.split()[0]), int(p.split()[1])) for p in preds]
 
                 for j in range(len(preds)):
+                    total_preds += 1
                     if preds[j][0]==t_start and preds[j][1]==t_end:
                         correct += 1
                         break
-            return correct / total_n
+            return correct / total_preds
 
 
 # A match is counted as correct if there is at least 50% overlap 
@@ -31,6 +33,7 @@ def discovery_partial_match(pred_file, truth_file):
             pred_list = fp.readlines()
             true_list = ft.readlines()
             assert len(pred_list) == len(true_list), "Test cases mismatch"
+            total_preds = 0
             total_n = len(pred_list)
             correct = 0
 
@@ -42,12 +45,13 @@ def discovery_partial_match(pred_file, truth_file):
                 preds = [(int(p.split()[0]), int(p.split()[1])) for p in preds]
 
                 for j in range(len(preds)):
+                    total_preds += 1
                     if (preds[j][0]<=t_start and preds[j][1]>=t_start+(t_end-t_start)//2) \
                         or (preds[j][0]<=t_start+(t_end-t_start)//2 and preds[j][1]>=t_end) \
                         or (preds[j][0]>=t_start and preds[j][1]<=t_end and (preds[j][1]-preds[j][0])>=(t_end-t_start)//2):
                         correct += 1
                         break
-            return correct / total_n
+            return correct / total_preds
 
 
 # doc level exact match
