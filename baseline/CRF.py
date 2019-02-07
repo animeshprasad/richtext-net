@@ -104,7 +104,7 @@ def sent2tokens(sent):
 
 
 ## train and return a model
-def run(neg_ratio=0.10, val_ratio=0.05, data_dir='../../data/data_60/'):
+def run(neg_ratio=0, val_ratio=0.05, data_dir='../../data/data_40/'):
     train_sents, val_sents = data_sampler(neg_ratio, val_ratio, data_dir)
 
     train_sents = get_sents(train_sents)
@@ -139,7 +139,7 @@ def run(neg_ratio=0.10, val_ratio=0.05, data_dir='../../data/data_60/'):
 
     return crf
 
-def doc_eval(model, doc_test, doc_out_dir, gold_dir, MAXLEN=60):
+def doc_eval(model, doc_test, doc_out_dir, gold_dir, MAXLEN=40):
     '''
     model: trained model 
     doc_test: processed doc test input
@@ -189,22 +189,9 @@ if __name__=='__main__':
 
     # 0.01, 0.05, 0.10, 0.20, 0.40, 0.80
     # 0.00, 0.20, 0.40, 0.60, 0.80, 1.00
-    # for i in [0.00]:
-    #     MAXLEN = 20
-    #     DIR = '../../data/data_20/'
-    #     out = '../../outputs/'
-    #     if not os.path.exists(out):
-    #         os.makedirs(out)
-    #     crf = run(neg_ratio=i, val_ratio=0.05, data_dir=DIR)
-    #     print ("Evaluate on doc tests")
-    #     doc_eval(crf, doc_tests, out+'doc_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/test_doc_gold', MAXLEN)
-    #     print ("Evaluate on zero shot tests")
-    #     doc_eval(crf, zero_shot_tests, out+'zeroshot_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/zero_shot_doc_gold', MAXLEN)
-
-    for i in [0.0125, 0.025, 0.05, 0.10, 0.20, 0.40]:
-        print ("NEG ratio: ", i)
-        MAXLEN = 40
-        DIR = '../../data/data_40/'
+    for i in [0, 0.0125, 0.025, 0.05, 0.1, 0.2, 0.4]:
+        MAXLEN = 30
+        DIR = '../../data/data_30/'
         out = '../../outputs/'
         if not os.path.exists(out):
             os.makedirs(out)
@@ -214,7 +201,19 @@ if __name__=='__main__':
         print ("Evaluate on zero shot tests")
         doc_eval(crf, zero_shot_tests, out+'zeroshot_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/zero_shot_doc_gold', MAXLEN)
 
-
+    # for LEN in [20, 30, 40, 60, 80]:
+    #     i = 0
+    #     MAXLEN = LEN
+    #     print ("LEN: ", MAXLEN)
+    #     DIR = '../../data/data_'+str(LEN)+'/'
+    #     out = '../../outputs/'
+    #     if not os.path.exists(out):
+    #         os.makedirs(out)
+    #     crf = run(neg_ratio=i, val_ratio=0.05, data_dir=DIR)
+    #     print ("Evaluate on doc tests")
+    #     doc_eval(crf, doc_tests, out+'doc_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/test_doc_gold', MAXLEN)
+    #     print ("Evaluate on zero shot tests")
+    #     doc_eval(crf, zero_shot_tests, out+'zeroshot_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/zero_shot_doc_gold', MAXLEN)
 
 
 
