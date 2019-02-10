@@ -287,15 +287,40 @@ def seg_exact_match(pred_list, true_list, pred_out_dir, gold_dir):
     return p, r, f
 
 
+def classify_score(pred_list, true_list):
+    # compute P, R, F1 of two lists
+    # each element in the list is a list of labels
+    # 0 (unknown) is not counted in either case
+    total_pred = len([y for a in pred_list for y in a if y!=0])
+    total_true = len([y for a in true_list for y in a if y!=0])
+    correct = 0
+    for i in range(len(pred_list)):
+        for p in pred_list[i]:
+            if p == 0:
+                continue
+            if p in true_list[i]:
+                correct += 1
+                true_list[i].remove(p) # avoid repeated counting
+    if total_pred==0:
+        precision = 0
+    else:
+        precision = correct / total_pred
+
+    if total_true==0:
+        recall = 0
+    else:
+        recall = correct / total_true 
+
+    if precision+recall == 0:
+        f1 = 0
+    else:
+        f1 = 2*precision*recall / (precision+recall)
+    print ("classification score: \n precision: {}, recall: {}, f1: {}".format(precision, recall, f1))
+    return precision, recall, f1 
 
 
-'''
-TODO:
-evaluation: 
-token-wise P, R, F1
-mention-wise P, R, F1
 
-'''
+
 
 
 
