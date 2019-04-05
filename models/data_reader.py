@@ -4,7 +4,7 @@ import codecs
 
 
 def read_sent(sent):
-    sent = SpaceTokenizer().tokenize(sent.strip())
+    sent = SpaceTokenizer().tokenize(sent)
     start = int(sent[0])
     end = int(sent[1])
     dataset = int(sent[2])
@@ -47,7 +47,7 @@ def read_doc(doc, labels):
 
 
 ## sample train and val data
-def data_sampler(neg_ratio, val_ratio=0.05, data_dir='../../data/data_60/'):
+def data_sampler(neg_ratio, val_ratio=0.025, data_dir='../../data/data_40/'):
     np.random.seed(2019)
     data = []
     with codecs.open(data_dir+'pos_data', 'r') as pos:
@@ -64,7 +64,7 @@ def data_sampler(neg_ratio, val_ratio=0.05, data_dir='../../data/data_60/'):
 
     val = int(len(data)*(1-val_ratio))
     train_data = data[: val]
-    val_data = data[: val]
+    val_data = data[val :]
 
     return train_data, val_data
 

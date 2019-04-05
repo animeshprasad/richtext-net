@@ -7,8 +7,10 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Model, Input, Sequential
 from keras import regularizers
-from keras.layers import LSTM, Embedding, Dense, TimeDistributed, Dropout, Bidirectional, Input, Flatten
+from keras.layers import Concatenate, LSTM, Embedding, Dense, TimeDistributed, Dropout, Bidirectional
+from keras.layers import Reshape, Convolution1D, GlobalMaxPooling1D, Concatenate, Lambda
 from sklearn import metrics
+from keras.backend import reshape
 import re
 import os
 from keras_contrib.layers import CRF
@@ -17,6 +19,35 @@ from keras import layers
 from sklearn.metrics import precision_recall_fscore_support as score
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 
+
+# upper and lower cases are different in our case
+char_dict = {}
+alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}"
+alphabet_size = len(alphabet) 
+# 0 is saved for padding
+for idx, char in enumerate(alphabet):
+    char_dict[char] = idx + 1
+    
+# convert sentences to char idx
+def word2idx(data, max_sent_len=40, max_word_len=10):
+    # data shape: (N, sent_len)
+    # if sent_len < max_sent_len, will pad with spaces (will turn into all zeros)
+    # out shape: (N, sent_len, word_len)
+    res = []
+    for sent in data:
+        sent_idx = np.zeros((max_sent_len, max_word_len))
+        sent_len = min(max_sent_len, len(sent))
+        for i in range(sent_len):
+            word = sent[i]
+            word_len = min(max_word_len, len(word))
+            for j in range(word_len):
+                c = word[j]
+                if c in char_dict:
+                    sent_idx[i][j] = char_dict[c]
+        res.append(sent_idx)
+    res = np.asarray(res)
+    return res
+        
 def data_loader(f):
     sents = []
     labels = []
@@ -41,6 +72,9 @@ def prep_data(neg_ratio=0.0125, val_ratio=0.05, data_dir='../../data/data_40/', 
 
     X_val = [sent2tokens(s) for s in val_sents]
     Y_val_seq = [sent2labels(s) for s in val_sents]
+    
+    X_train_char = word2idx(X_train)
+    X_val_char = word2idx(X_val)
     
     tokenizer = Tokenizer()
     tokenizer.fit_on_texts(X_train)
@@ -82,7 +116,7 @@ def prep_data(neg_ratio=0.0125, val_ratio=0.05, data_dir='../../data/data_40/', 
     Y_train_cls = keras.utils.to_categorical(Y_train_cls, num_classes=DATASET_CLASS)
     Y_val_cls = keras.utils.to_categorical(Y_val_cls, num_classes=DATASET_CLASS)
 
-    return X_train, Y_train_seq, Y_train_cls, X_val, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, tokenizer
+    return X_train, X_train_char, Y_train_seq, Y_train_cls, X_val, X_val_char, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, tokenizer
 
 
 ## load test data for classification task
@@ -161,32 +195,59 @@ def sent2labels(sent):
 def sent2tokens(sent):
     return [token for token, label in sent]
 
-
-def run(X_train, Y_train_seq, Y_train_cls, X_val, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, maxlen=40, emb_dim=300, neg_ratio=0.0125, hidden_dim=100, drop=0.2, r_drop=0.1, epochs=10):
+def run(X_train, X_train_char, Y_train_seq, Y_train_cls, X_val, X_val_char, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, max_sent_len=40, max_word_len=10, word_emb_dim=300, char_emb_dim=300, num_filters=300, kernel_size=6, kernel=256, window=6, neg_ratio=0.0125, hidden_dim=100, drop=0.2, r_drop=0.1, epochs=10):
+    def backend_reshape(x):
+        #x: (N, sent_len, word_len)
+        #return: (N*sent_len, word_len)
+        return reshape(x, (-1, max_word_len))
+    
+    def backend_reshape_back(x):
+        #x: (N*sent_len, char_emb)
+        return reshape(x, (-1, max_sent_len, num_filters))
+    
     ##build model
-    input = Input(shape=(maxlen,))
-    emb = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
-    [lstm_seq, state_h_fw, state_h_bw, state_c_fw, state_c_bw] = Bidirectional(LSTM(hidden_dim, return_sequences=True, return_state=True, recurrent_dropout=r_drop))(emb) 
-    [lstm_seq, state_h_fw, state_h_bw, state_c_fw, state_c_bw] = Bidirectional(LSTM(hidden_dim, return_sequences=True, return_state=True, recurrent_dropout=r_drop))(lstm_seq) 
-    state_h = layers.Concatenate(axis=-1)([state_h_fw, state_h_bw])
-    labels = TimeDistributed(Dense(hidden_dim//2, activation='relu'))(lstm_seq)
-    lstm_seq_drop = TimeDistributed(Dropout(drop))(labels)
+    word_input = Input(shape=(max_sent_len,))
+    char_input_orig = Input(shape=(max_sent_len, max_word_len,))
+    # (N, sent_len, word_emb)
+    word_emb = Embedding(vocab_size, word_emb_dim, weights=[embedding_matrix], input_length=max_sent_len, trainable=False)(word_input)
+    
+    char_input = Lambda(backend_reshape)(char_input_orig) #(N*sent_len, word_len)
+    # (N*sent_len, word_len, char_emb)
+    char_emb = Embedding(alphabet_size+1, char_emb_dim, input_length=max_word_len)(char_input)
+    char_emb = Convolution1D(filters=num_filters, kernel_size=kernel_size, activation='relu')(char_emb)
+    char_emb = GlobalMaxPooling1D()(char_emb) #(N*sent_len, num_filters)
+    char_emb = Lambda(backend_reshape_back)(char_emb)
+    model = Concatenate()([word_emb, char_emb]) #(N, sent_len, word_emb+num_filters)
+    
+    emb_model = Dropout(drop)(model)
+    lstm_model = Bidirectional(LSTM(hidden_dim, return_sequences=True, recurrent_dropout=r_drop))(emb_model)
+#     lstm_model = Bidirectional(LSTM(hidden_dim, return_sequences=True, recurrent_dropout=r_drop))(lstm_model)
     crf = CRF(2)
-    mention = crf(labels)
-   
-    state_h = Dropout(drop)(state_h)
-    data_id = Dense(DATASET_CLASS, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(state_h)
-    model = Model(input, [mention, data_id])
+    mention = crf(lstm_model)
+    
+    # classification model
+#     seq = Concatenate()([emb_model, lstm_model])
+    seq = lstm_model
+#     seq = Dropout(drop)(seq)
+    seq = Dense(hidden_dim*2, activation='relu')(seq)
+    seq = Dropout(drop)(seq)
+
+    model = Convolution1D(filters=kernel, kernel_size=window, activation='relu')(seq)
+    model = GlobalMaxPooling1D()(model) # (N, cnn_filters)
+#     model = Bidirectional(LSTM(hidden_dim, recurrent_dropout=r_drop))(seq)
+    data_id = Dense(DATASET_CLASS, activation="sigmoid")(model)
+    
+    model = Model([word_input, char_input_orig], [mention, data_id])
     
     Y_train_seq_2 = keras.utils.to_categorical(Y_train_seq)
     Y_val_seq_2 = keras.utils.to_categorical(Y_val_seq)
 
     model.compile(optimizer='adam', loss=[crf.loss_function, 'categorical_crossentropy'], metrics=['accuracy']) 
 #     history = model.fit(X_train, [Y_train_seq, Y_train_cls], batch_size=64, epochs=10, validation_data=(X_val, [Y_val_seq, Y_val_cls]))
-    history = model.fit(X_train, [Y_train_seq_2, Y_train_cls], batch_size=64, epochs=epochs, validation_data=(X_val, [Y_val_seq_2, Y_val_cls]))
+    history = model.fit([X_train, X_train_char], [Y_train_seq_2, Y_train_cls], batch_size=64, epochs=epochs, validation_data=([X_val, X_val_char], [Y_val_seq_2, Y_val_cls]))
 
-    
-    [preds, data_ids] = model.predict(X_val)
+
+    [preds, data_ids] = model.predict([X_val, X_val_char])
     
     test = [[np.argmax(y) for y in x] for x in preds]
     test_arr = np.asarray(test)
@@ -215,13 +276,13 @@ def doc_pred(model, doc, tokenizer, MAXLEN=40):
     splits = []
     for i in range(0, len(doc), MAXLEN):
         splits.append(doc[i: i+MAXLEN])
+    splits_char = word2idx(splits)
     splits = tokenizer.texts_to_sequences(splits)
     splits = pad_sequences(splits, maxlen=MAXLEN)
-    [preds, data_ids] = model.predict(splits)
+    [preds, data_ids] = model.predict([splits, splits_char])
     seq_preds = [np.argmax(y) for x in preds for y in x]
     cls_preds = [np.argmax(y) for y in data_ids]
     return seq_preds, cls_preds
-
 
 def doc_eval_seq(model, tokenizer, doc_test, doc_out_dir, gold_dir, MAXLEN=40):
     doc_preds = []
@@ -257,7 +318,6 @@ def doc_eval_seq(model, tokenizer, doc_test, doc_out_dir, gold_dir, MAXLEN=40):
     print ('evaluating data from: ', doc_out_dir)
     print ('doc exact: ', doc_exact_match(doc_out_dir, gold_dir))
     print ('doc partial: ', doc_partial_match(doc_out_dir, gold_dir))
-
 
 
 def doc_eval_cls(model, doc, labels, tokenizer, MAXLEN=40):
@@ -315,59 +375,69 @@ def doc_eval(model, tokenizer, doc_test, cls_labels, doc_out_dir, gold_dir, MAXL
     return p, r, f
 
 
-##load glove
-embedding_index = {}
-f = open('../../glove.6B.300d.txt')
-for line in f:
-    values = line.split()
-    word = values[0]
-    coefs = np.asarray(values[1:], dtype='float32')
-    embedding_index[word] = coefs
-f.close()
+if __name__=='__main__':
+	##load glove
+	embedding_index = {}
+	f = open('../../glove.840B.300d.txt', encoding='utf8')
+	for line in f:
+	    values = line.split()
+	    word = ''.join(values[:-300])
+	    coefs = np.asarray(values[-300:], dtype='float32')
+	    embedding_index[word] = coefs
+	f.close()
 
 
-# Load all test data for both tasks
-threshold = 0.5
-doc_dir = "../../data/all_test_docs/"
-doc_test_y, doc_test_x = get_doc_test('test_doc_gold', 'test_docs')
-doc_tests = [read_doc(doc_test_x[d], doc_test_y[d]) for d in range(len(doc_test_x))]
-doc_tests = [sent2tokens(s) for s in doc_tests]
+	# Load all test data for both tasks
+	threshold = 0.5
+	doc_dir = "../../data/all_test_docs/"
+	doc_test_y, doc_test_x = get_doc_test('test_doc_gold', 'test_docs')
+	doc_tests = [read_doc(doc_test_x[d], doc_test_y[d]) for d in range(len(doc_test_x))]
+	doc_tests = [sent2tokens(s) for s in doc_tests]
 
-zero_shot_y, zero_shot_x = get_doc_test('zero_shot_doc_gold', 'zero_shot_docs')
-zero_shot_tests = [read_doc(zero_shot_x[d], zero_shot_y[d]) for d in range(len(zero_shot_x))]
-zero_shot_tests = [sent2tokens(s) for s in zero_shot_tests]
+	zero_shot_y, zero_shot_x = get_doc_test('zero_shot_doc_gold', 'zero_shot_docs')
+	zero_shot_tests = [read_doc(zero_shot_x[d], zero_shot_y[d]) for d in range(len(zero_shot_x))]
+	zero_shot_tests = [sent2tokens(s) for s in zero_shot_tests]
 
-MAXLEN = 40
-DIR = '../../data/data_40/'
-out_dir = '../../outputs/'
+	MAXLEN = 40
+	DIR = '../../data/data_40/'
+	out_dir = '../../outputs/'
 
-if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+	if not os.path.exists(out_dir):
+	        os.makedirs(out_dir)
 
-test_labels, test_sents, zeroshot_labels, zeroshot_sents = load_test()
-DATASET_CLASS = 10349  ## one class for no mention (#0)
-
-
-# Get Training Data
-neg_ratio = 0.0125
-X_train, Y_train_seq, Y_train_cls, X_val, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, tokenizer = prep_data(neg_ratio=neg_ratio)
+	test_labels, test_sents, zeroshot_labels, zeroshot_sents = load_test()
+	DATASET_CLASS = 10349  ## one class for no mention (#0)
 
 
-hidden_dim = 100
-drop = 0.1
-r_drop=0.1
-model, history = run(X_train, Y_train_seq, Y_train_cls, X_val, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, neg_ratio=neg_ratio, hidden_dim=hidden_dim, drop=drop, r_drop=r_drop)
+	# Get Training Data
+	neg_ratio = 0.015
+	X_train, X_train_char, Y_train_seq, Y_train_cls, X_val, X_val_char, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, tokenizer = prep_data(neg_ratio=neg_ratio)
+
+	# lstm_output
+	# one-layer lstm
+	char_emb_dim = 300
+	char_num_filters = 400 
+	char_kernel_size = 6
+	cnn_num_kernels = 128
+	cnn_window = 6
+	hidden_dim = 64
+	drop = 0.2
+	r_drop = 0
+	epochs = 6
+	model, history = run(X_train, X_train_char, Y_train_seq, Y_train_cls, X_val, X_val_char, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, max_sent_len=40, max_word_len=10, word_emb_dim=300, char_emb_dim=char_emb_dim, num_filters=char_num_filters, kernel_size=char_kernel_size, kernel=cnn_num_kernels, window=cnn_window, neg_ratio=0.0125, hidden_dim=hidden_dim, drop=drop, r_drop=r_drop, epochs=epochs)
+	print ('Test Set:')
+	doc_eval(model, tokenizer, doc_tests, test_labels, out_dir+'doc_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/test_doc_gold')
+	print ('Zero-shot Test:')
+	doc_eval(model, tokenizer, zero_shot_tests, zeroshot_labels, out_dir+'zeroshot_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/zero_shot_doc_gold')
 
 
-hidden_dim = 300
-epochs=20
-drop = 0.3
-r_drop=0.3
-model, history = run(X_train, Y_train_seq, Y_train_cls, X_val, Y_val_seq, Y_val_cls, embedding_matrix, vocab_size, neg_ratio=neg_ratio, hidden_dim=hidden_dim, drop=drop, r_drop=r_drop, epochs=epochs)
-print ('Test Set:')
-doc_eval(model, tokenizer, doc_tests, test_labels, out_dir+'doc_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/test_doc_gold')
-print ('Zero-shot Test:')
-doc_eval(model, tokenizer, zero_shot_tests, zeroshot_labels, out_dir+'zeroshot_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/zero_shot_doc_gold')
+
+
+
+
+
+
+
 
 
 

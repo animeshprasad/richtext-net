@@ -115,7 +115,7 @@ class DataParser:
                                         str(sample_text_spans.index(new_mention_text_spans[0]) - splits*(max_length_token)) +
                                         ' ' + str(sample_text_spans.index(new_mention_text_spans[-1]) - splits*(max_length_token)) +
                                         ' ' + str(row['data_set_id']) + ' ' + str(row['publication_id']) +
-                                         ' ' + ' '.join(sample_text_tokens[splits*(max_length_token):(splits+1)*(max_length_token)])
+                                         ' ' + ' '.join(sample_text_tokens[splits*(max_length_token):(splits+1)*(max_length_token)+1])
                                         + '\n'
                                     )
                         else:
@@ -411,11 +411,11 @@ if __name__ == '__main__':
     # data_parser = DataParser(outdir='../data/data_40/')
     # data_parser.get_train_data(40, False)   
 
-    data_parser = DataParser(outdir='../data/data_80/')
-    data_parser.get_train_data(80, False)  
+    # data_parser = DataParser(outdir='../data/data_80/')
+    # data_parser.get_train_data(80, False)  
 
-    data_parser = DataParser(outdir='../data/data_40/')
-    data_parser.get_train_data(40)   
+    data_parser = DataParser(outdir='../data/data_10/')
+    data_parser.get_train_data(30)   
 
 
 

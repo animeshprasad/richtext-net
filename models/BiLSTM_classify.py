@@ -152,7 +152,7 @@ if __name__=='__main__':
 	test_labels, test_sents, zeroshot_labels, zeroshot_sents = load_test()
 	DATASET_CLASS = 10349  ## one class for no mention (#0)
 	X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, tokenizer = prep_data(neg_ratio=0.0125)
-	model, history, p, r, f  = run(X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, hidden_dim=128, drop=0, r_drop=0)
+	model, history, p, r, f  = run(X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, hidden_dim=64, drop=0, r_drop=0)
 	doc_eval(model, test_sents, test_labels, tokenizer)
 	doc_eval(model, zeroshot_sents, zeroshot_labels, tokenizer)
 
